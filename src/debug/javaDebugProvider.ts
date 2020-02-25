@@ -61,6 +61,7 @@ export class JavaDebugProvider implements IDebugProvider {
 
     public async resolvePortsFromFile(dockerfile: IDockerfile, env: Dictionary<string>): Promise<PortInfo | undefined> {
         let rawDebugPortInfo: string;
+        let rawAppPortInfo: string | undefined;
 
         // Resolve the debug port.
         const matches = dockerfile.searchLaunchArgs(javaDebugOptsRegExp);
@@ -83,7 +84,7 @@ export class JavaDebugProvider implements IDebugProvider {
         // Resolve the app port.
         const exposedPorts = dockerfile.getExposedPorts();
         const possiblePorts = exposedPorts.length ? exposedPorts.filter((port) => port !== rawDebugPortInfo) : [];
-        const rawAppPortInfo = await debugUtils.promptForAppPort(possiblePorts, defaultJavaAppPort, env);
+        rawAppPortInfo = await debugUtils.promptForAppPort(possiblePorts, defaultJavaAppPort, env);
 
         return {
             debugPort: Number(rawDebugPortInfo),
@@ -120,8 +121,9 @@ export class JavaDebugProvider implements IDebugProvider {
         };
     }
 
-    public filterSupportedProcesses(_processes: debugUtils.ProcessInfo[]): debugUtils.ProcessInfo[] | undefined {
-        return undefined;
+    public filterSupportedProcesses(processes: debugUtils.ProcessInfo[]): debugUtils.ProcessInfo[] | undefined {
+        return processes.filter((processInfo) => (processInfo.command.toLowerCase().startsWith('java ') ||
+                                                  processInfo.command.indexOf('/java ') >= 0)); // full path
     }
 
     public isPortRequired(): boolean {
