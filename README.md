@@ -1,3 +1,10 @@
+# This is a customized version of the Kubernetes extension for use by the c2c-actions team.
+
+To contribute customizations you can make changes in the azdevnext branch of this [Repo](https://github.com/github/vscode-kubernetes-tools/tree/azdevnext).
+
+Customizations:
+- better auto discovery of the correct debugger to use when attaching to a container.
+
 # Visual Studio Code Kubernetes Tools
 [![Build Status](https://travis-ci.org/Azure/vscode-kubernetes-tools.svg?branch=master)](https://travis-ci.org/Azure/vscode-kubernetes-tools)
 
