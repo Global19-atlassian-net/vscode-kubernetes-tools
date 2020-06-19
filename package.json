@@ -1283,6 +1283,6 @@
     },
     "repository": {
         "type": "git",
-        "url": "https://github.com/Azure/vscode-kubernetes-tools"
+        "url": "https://github.com/github/vscode-kubernetes-tools/tree/azdevnext"
     }
 }
