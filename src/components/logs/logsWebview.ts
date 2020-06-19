@@ -1,9 +1,12 @@
 import * as vscode from 'vscode';
 import { WebPanel } from '../webpanel/webpanel';
+import { RunningProcess } from '../../binutilplusplus';
 
 export class LogsPanel extends WebPanel {
     public static readonly viewType = 'vscodeKubernetesLogs';
     public static currentPanels = new Map<string, LogsPanel>();
+
+    public appendContentProcess: RunningProcess | undefined;
 
     public static createOrShow(content: string, resource: string): LogsPanel {
         const fn = (panel: vscode.WebviewPanel, content: string, resource: string): LogsPanel => {
@@ -22,11 +25,21 @@ export class LogsPanel extends WebPanel {
 
     public addContent(content: string) {
         this.content += content;
-        if (this.canProcessMessages) {
-            this.panel.webview.postMessage({
-                command: 'content',
-                text: content,
-            });
+        this.panel.webview.postMessage({
+            command: 'content',
+            text: content,
+        });
+    }
+
+    public setAppendContentProcess(proc: RunningProcess) {
+        this.deleteAppendContentProcess();
+        this.appendContentProcess = proc;
+    }
+
+    public deleteAppendContentProcess() {
+        if (this.appendContentProcess) {
+            this.appendContentProcess.terminate();
+            this.appendContentProcess = undefined;
         }
     }
 
@@ -51,21 +64,133 @@ export class LogsPanel extends WebPanel {
                 </select>
                 <span style='position: absolute; left: 240px'>Match expression</span>
                 <input style='left:350px; position: absolute' type='text' id='regexp' onkeyup='eval()' placeholder='Filter' size='25'/>
+                <input style='left:575px; position: absolute' type='button' id='goToBottom' size='25' value='Scroll To Bottom'/>
             </div>
             <div style='position: absolute; top: 55px; bottom: 10px; width: 97%'>
-              <div style="overflow-y: scroll; height: 100%">
+              <div id="logPanel" style="overflow-y: scroll; height: 100%">
                   <code>
                     <pre id='content'>
                     </pre>
+                    <a id='bottom' />
                   </code>
                 </div>
             </div>
             <script>
+              let renderNonce = 0;
+              let orig = \`${this.content}\`.split('\\n');
+
+              const filterAll = () => {
+                return filter(orig, false);
+              }
+
+              const filterNewLogs = (logsText) => {
+                return filter(logsText, true);
+              }
+
+              const filter = (text, isNewLog) => {
+                const regexp = document.getElementById('regexp').value;
+                const mode = document.getElementById('mode').value;
+                let content;
+                if (regexp.length > 0 && mode !== 'all') {
+                    const regex = new RegExp(regexp);
+                    switch (mode) {
+                        case 'include':
+                            content = text.filter((line) => regex.test(line));
+                            break;
+                        case 'exclude':
+                            content = text.filter((line) => !regex.test(line));
+                            break;
+                        case 'before':
+                            content = [];
+                            if (!isNewLog) {
+                                for (const line of text) {
+                                    if (regex.test(line)) {
+                                        break;
+                                    }
+                                    content.push(line);
+                                }
+                            }
+                            break;
+                        case 'after':
+                            if (isNewLog) {
+                                content = text;
+                            } else {
+                                const i = text.findIndex((line) => {
+                                    return regex.test(line)
+                                });
+                                content = text.slice(i+1);
+                            }
+                            break;
+                        default:
+                            content = []
+                            break;
+                    }
+                } else {
+                    content = text;
+                }
+
+                return content;
+              };
+
+              const beautifyContentLineRange = (contentLines, ix, end) => {
+                if (ix && end) {
+                    contentLines = contentLines.slice(ix, end);
+                }
+                return beautifyLines(contentLines);
+              }
+
+              const beautifyLines = (contentLines) => {
+                let content = contentLines.join('\\n');
+                if (content) {
+                    content = content.match(/\\n$/) ? content : content + '\\n';
+                }
+                return content;
+              };
+
               var lastMode = '';
               var lastRegexp = '';
-              var renderNonce = 0;
+              var isToBottom = true;
 
-              var orig = \`${this.content}\`.split('\\n');
+              function debounce(func, wait, immediate) {
+                var timeout;
+                return function() {
+                  var context = this, args = arguments;
+                  var later = function() {
+                    timeout = null;
+                    if (!immediate) func.apply(context, args);
+                  };
+                  var callNow = immediate && !timeout;
+                  clearTimeout(timeout);
+                  timeout = setTimeout(later, wait);
+                  if (callNow) func.apply(context, args);
+                };
+              };
+
+              const elem = document.getElementById('logPanel');
+              let lastScrollTop = 0;
+              let toBottom = debounce(function() {
+                const st = elem.scrollTop;
+                if (st > lastScrollTop){
+                  // scroll down
+                  isToBottom = (elem.scrollTop + window.innerHeight) >= elem.scrollHeight;
+                } else {
+                  // scroll up
+                  isToBottom = false;
+                }
+                lastScrollTop = st <= 0 ? 0 : st;
+              }, 250);
+
+              elem.addEventListener("scroll", toBottom);
+
+              const button = document.getElementById('goToBottom');
+
+              function scrollToBottom () {
+                document.getElementById('bottom').scrollIntoView();
+              }
+
+              button.addEventListener('click', function(){
+                scrollToBottom();
+              });
 
               window.addEventListener('message', event => {
                 const message = event.data;
@@ -78,59 +203,26 @@ export class LogsPanel extends WebPanel {
                             orig.push(line);
                         }
                     });
-                    // TODO: need to apply filters here!
-                    elt.appendChild(document.createTextNode(message.text));
+                    const content = beautifyLines(filterNewLogs(text));
+                    elt.appendChild(document.createTextNode(content));
+
+                    // handle auto-scroll on/off
+                    if (isToBottom) scrollToBottom();
                 }
               });
 
-              var eval = () => {
+              const eval = () => {
                 setTimeout(evalInternal, 0);
               };
-              var evalInternal = () => {
+
+              const evalInternal = () => {
                 // We use this to abort renders in progress if a new render starts
                 renderNonce = Math.random();
-                var currentNonce = renderNonce;
+                const currentNonce = renderNonce;
 
-                var regexp = document.getElementById('regexp').value;
-                var mode = document.getElementById('mode').value;
-                if (lastMode == mode && lastRegexp == regexp) {
-                    return;
-                }
-                lastRegexp = regexp;
-                lastMode = mode;
-                if (regexp.length > 0) {
-                    var regex = new RegExp(regexp);
-                    switch (mode) {
-                        case 'all':
-                            content = orig;
-                            break;
-                        case 'include':
-                            content = orig.filter((line) => regex.test(line));
-                            break;
-                        case 'exclude':
-                            content = orig.filter((line) => !regex.test(line));
-                            break;
-                        case 'before':
-                            content = [];
-                            for (const line of orig) {
-                                if (regex.test(line)) {
-                                    break;
-                                }
-                                content.push(line);
-                            }
-                            break;
-                        case 'after':
-                            const i = orig.findIndex((line) => {
-                                return regex.test(line)
-                            });
-                            content = orig.slice(i+1);
-                            break;
-                    }
-                } else {
-                    content = orig;
-                }
+                const content = filterAll();
 
-                var elt = document.getElementById('content');
+                const elt = document.getElementById('content');
                 elt.textContent = '';
 
                 // This is probably seems more complicated than necessary.
@@ -138,25 +230,32 @@ export class LogsPanel extends WebPanel {
                 // So we split it up into manageable chunks to keep the UX lively.
                 // Of course the trouble is then we could interleave multiple different filters.
                 // So we use the random nonce to detect and pre-empt previous renders.
-                var ix = 0;
+                let ix = 0;
                 const step = 1000;
-                var fn = () => {
+                const fn = () => {
                     if (renderNonce != currentNonce) {
                         return;
                     }
                     if (ix >= content.length) {
                         return;
                     }
-                    var end = Math.min(content.length, ix + step);
-                    elt.appendChild(document.createTextNode(content.slice(ix, end).join('\\n')));
+                    const end = Math.min(content.length, ix + step);
+                    elt.appendChild(document.createTextNode(beautifyContentLineRange(content, ix, end)));
                     ix += step;
                     setTimeout(fn, 0);
                 }
                 fn();
               };
               eval();
+
             </script>
             </body>
         </html>`;
     }
+
+    protected dispose() {
+        this.deleteAppendContentProcess();
+        super.dispose(LogsPanel.currentPanels);
+    }
+
 }

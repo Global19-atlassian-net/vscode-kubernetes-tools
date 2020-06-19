@@ -1,5 +1,38 @@
 # Change Log
 
+## 1.2.1
+
+* Helm releases now have Uninstall and Rollback commands
+* Follow Logs now has a 'scroll to bottom' button
+* We now support Debug (Launch) for Node.js projects
+* You can now click on a Helm Repos tree error node to see what the problem was
+* Fixed Preview Template command with Helm 3
+* Fixed path escaping issue with nested directories when debugging .NET applications
+* Fixed issue with attaching to Node.js applications
+
+Thanks to Eli Arbel, Brian Fitzpatrick, Shreyas Karnik, Beda Kuster and Luca Stocchi.
+
+## 1.2.0
+
+* Added Cluster Explorer API v1.1 (watch support, and metadata now always present)
+* Fixed filter not being applied to new logs in Follow Logs
+* Fixed breakpoints not working when debugging .NET applications
+* Fixed Start Minikube command not working because status check failed
+* Fixed issue where VS Code was injecting garbage into Set Kubeconfig
+* Fixed error and leak when reusing an existing logs panel
+
+Thanks to Matthias Janson and Luca Stocchi.  Luca also joins the project as a core
+maintainer!
+
+## 1.1.1
+
+* You can now watch resources in the cluster explorer - get live updates as they change
+* Cloud explorer Merge To Kubeconfig command now creates a default kubeconfig if no kubeconfig exists
+* Updated .NET debugging support to new C# extension ID
+* Fixed AKS dashboard not showing on Kubernetes 1.14 or above
+
+Thanks to hermanho, Mattias Karlsson and Luca Stocchi.
+
 ## 1.1.0
 
 * Added .NET debugging support

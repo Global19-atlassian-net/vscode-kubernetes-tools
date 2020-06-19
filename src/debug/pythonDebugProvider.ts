@@ -1,13 +1,14 @@
 import * as path from "path";
 import * as vscode from "vscode";
 
-import { IDebugProvider, PortInfo } from "./debugProvider";
+import { IDebugProvider, PortInfo, Cancellable } from "./debugProvider";
 import { suggestedShellForContainer } from '../utils/container-shell';
 import * as config from '../components/config/config';
 import * as extensionUtils from "../extensionUtils";
 import { Kubectl } from "../kubectl";
 import { kubeChannel } from "../kubeChannel";
 import { ProcessInfo } from "./debugUtils";
+import { ExecResult } from "../binutilplusplus";
 
 const debuggerType = 'python';
 const defaultPythonDebuggerExtensionId = 'ms-python.python';
@@ -75,8 +76,8 @@ export class PythonDebugProvider implements IDebugProvider {
             const nsarg = podNamespace ? `--namespace ${podNamespace}` : '';
             const containerCommand = containerName? `-c ${containerName}` : '';
             const execCmd = `exec ${podName} ${nsarg} ${containerCommand} -- ${this.shell} -c 'readlink /proc/1/cwd'`;
-            const execResult = await kubectl.invokeAsync(execCmd);
-            if (execResult !== undefined && execResult.code === 0) {
+            const execResult = await kubectl.invokeCommand(execCmd);
+            if (ExecResult.succeeded(execResult)) {
                 const remoteRoot = execResult.stdout.replace(/(\r\n|\n|\r)/gm, '');
                 kubeChannel.showOutput(`Got remote root from container: ${remoteRoot}`);
                 return remoteRoot;
@@ -97,5 +98,9 @@ export class PythonDebugProvider implements IDebugProvider {
 
     public isPortRequired(): boolean {
         return true;
+    }
+
+    public async getDebugArgs(): Promise<Cancellable> {
+        return { cancelled: false };
     }
 }
