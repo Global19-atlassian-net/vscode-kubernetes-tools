@@ -1,8 +1,8 @@
 {
     "name": "vscode-kubernetes-tools",
     "displayName": "Kubernetes",
-    "description": "Develop, deploy and debug Kubernetes applications",
-    "version": "99.0.0",
+    "description": "Develop, deploy and debug Kubernetes applications (based off 1.2.1)",
+    "version": "99.0.1",
     "publisher": "ms-kubernetes-tools",
     "engines": {
         "vscode": "^1.31.0"
@@ -27,9 +27,11 @@
     "activationEvents": [
         "onCommand:extension.vsKubernetesCreate",
         "onCommand:extension.vsKubernetesCreateFile",
+        "onCommand:extension.vsKubernetesAddWatch",
         "onCommand:extension.vsKubernetesDelete",
         "onCommand:extension.vsKubernetesDeleteNow",
         "onCommand:extension.vsKubernetesDeleteUri",
+        "onCommand:extension.vsKubernetesDeleteWatch",
         "onCommand:extension.vsKubernetesDescribe.Refresh",
         "onCommand:extension.vsKubernetesApply",
         "onCommand:extension.vsKubernetesApplyFile",
@@ -76,6 +78,8 @@
         "onCommand:extension.helmPackage",
         "onCommand:extension.helmFetch",
         "onCommand:extension.helmInstall",
+        "onCommand:extension.helmUninstall",
+        "onCommand:extension.helmRollback",
         "onCommand:extension.helmDependencies",
         "onCommand:extension.helmConvertToTemplate",
         "onCommand:extension.helmParameterise",
@@ -255,6 +259,10 @@
                         "vs-kubernetes.python-debug-port": {
                             "type": "number",
                             "description": "Remote debugging port for Python. Usually 5678."
+                        },
+                        "vs-kubernetes.resources-to-watch": {
+                            "type": "array",
+                            "description": "List of resources to be watched."
                         }
                     },
                     "default": {
@@ -455,6 +463,16 @@
                     "when": "view == extension.vsKubernetesExplorer && viewItem =~ /vsKubernetes\\.kind/i"
                 },
                 {
+                    "command": "extension.vsKubernetesAddWatch",
+                    "group": "3@1",
+                    "when": "view == extension.vsKubernetesExplorer && viewItem =~ /k8s-watchable/i"
+                },
+                {
+                    "command": "extension.vsKubernetesDeleteWatch",
+                    "group": "3@2",
+                    "when": "view == extension.vsKubernetesExplorer && viewItem =~ /k8s-watchable/i"
+                },
+                {
                     "command": "extension.vsKubernetesLoad",
                     "group": "0",
                     "when": "view == extension.vsKubernetesExplorer && viewItem =~ /vsKubernetes\\.resource(?!\\.namespace).*/i"
@@ -545,6 +563,11 @@
                     "when": "view == extension.vsKubernetesExplorer && viewItem =~ /vsKubernetes\\.file/i"
                 },
                 {
+                    "command": "extension.vsKubernetesCopy",
+                    "when": "view == extension.vsKubernetesExplorer && viewItem =~ /vsKubernetes\\.helmrelease/i",
+                    "group": "1"
+                },
+                {
                     "command": "extension.helmFetch",
                     "group": "1",
                     "when": "view == extension.vsKubernetesHelmRepoExplorer && viewItem =~ /vsKubernetes\\.((chart)|(chartversion))/i"
@@ -568,6 +591,16 @@
                     "command": "extension.helmInspectValues",
                     "group": "0@2",
                     "when": "view == extension.vsKubernetesHelmRepoExplorer && viewItem =~ /vsKubernetes\\.((chart)|(chartversion))/i"
+                },
+                {
+                    "command": "extension.helmRollback",
+                    "group": "3@1",
+                    "when": "view == extension.vsKubernetesExplorer && viewItem =~ /vsKubernetes\\.helmhistory/i"
+                },
+                {
+                    "command": "extension.helmUninstall",
+                    "group": "3@2",
+                    "when": "view == extension.vsKubernetesExplorer && viewItem =~ /vsKubernetes\\.helmrelease/i"
                 },
                 {
                     "command": "kubernetes.cloudExplorer.mergeIntoKubeconfig",
@@ -694,6 +727,11 @@
                 "category": "Kubernetes"
             },
             {
+                "command": "extension.vsKubernetesAddWatch",
+                "title": "Watch",
+                "category": "Kubernetes"
+            },
+            {
                 "command": "extension.vsKubernetesDelete",
                 "title": "Delete",
                 "category": "Kubernetes"
@@ -706,6 +744,11 @@
             {
                 "command": "extension.vsKubernetesDeleteUri",
                 "title": "Delete Kubernetes resource",
+                "category": "Kubernetes"
+            },
+            {
+                "command": "extension.vsKubernetesDeleteWatch",
+                "title": "Stop Watching",
                 "category": "Kubernetes"
             },
             {
@@ -1021,6 +1064,18 @@
                 "category": "Helm"
             },
             {
+                "command": "extension.helmUninstall",
+                "title": "Uninstall",
+                "description": "Uninstall a Helm release",
+                "category": "Helm"
+            },
+            {
+                "command": "extension.helmRollback",
+                "title": "Rollback",
+                "description": "Rollback Helm Release",
+                "category": "Helm"
+            },
+            {
                 "command": "extension.helmDependencies",
                 "title": "Show Dependencies",
                 "description": "List the dependencies of a Helm chart",
@@ -1250,8 +1305,10 @@
         "opn": "^5.2.0",
         "pluralize": "^4.0.0",
         "portfinder": "^1.0.13",
+        "rxjs": "^6.5.4",
         "semver": "^5.5.1",
         "shelljs": "^0.7.7",
+        "spawn-rx": "^3.0.0",
         "sshpk": "^1.13.2",
         "tar": "^4.4.1",
         "tmp": "^0.0.31",

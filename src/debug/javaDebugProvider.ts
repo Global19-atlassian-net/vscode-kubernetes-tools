@@ -1,7 +1,7 @@
 import * as path from "path";
 import * as vscode from "vscode";
 
-import { IDebugProvider, PortInfo } from "./debugProvider";
+import { IDebugProvider, PortInfo, Cancellable } from "./debugProvider";
 import * as debugUtils from "./debugUtils";
 import * as extensionUtils from "../extensionUtils";
 import { Kubectl } from "../kubectl";
@@ -128,5 +128,9 @@ export class JavaDebugProvider implements IDebugProvider {
 
     public isPortRequired(): boolean {
         return true;
+    }
+
+    public async getDebugArgs(): Promise<Cancellable> {
+        return { cancelled: false };
     }
 }

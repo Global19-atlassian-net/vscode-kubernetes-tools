@@ -1,16 +1,17 @@
 import * as path from "path";
 import * as vscode from "vscode";
 
-import { IDebugProvider, PortInfo } from "./debugProvider";
+import { IDebugProvider, PortInfo, Cancellable } from "./debugProvider";
 import { ProcessInfo } from "./debugUtils";
 import * as extensionUtils from "../extensionUtils";
 import { Kubectl } from "../kubectl";
 import { kubeChannel } from "../kubeChannel";
 import { IDockerfile } from "../docker/parser";
 import { Dictionary } from "../utils/dictionary";
+import * as extensionConfig from '../components/config/config';
 
 // Use the csharp debugger extension provided by Microsoft for csharp debugging.
-const defaultDotnetDebuggerExtensionId = "ms-vscode.csharp";
+const defaultDotnetDebuggerExtensionId = "ms-dotnettools.csharp";
 const defaultDotnetDebuggerExtension = "C# for Visual Studio Code";
 
 const defaultDotnetDebuggerConfigType = "dotnet";
@@ -33,7 +34,7 @@ export class DotNetDebugProvider implements IDebugProvider {
 
     public async startDebugging(workspaceFolder: string, _sessionName: string, _port: number | undefined, pod: string, pidToDebug: number | undefined): Promise<boolean> {
         const processId = pidToDebug ? pidToDebug.toString() : "${command:pickRemoteProcess}";
-        const debugConfiguration = {
+        const debugConfiguration: vscode.DebugConfiguration = {
             name: ".NET Core Kubernetes Attach",
             type: "coreclr",
             request: "attach",
@@ -46,6 +47,16 @@ export class DotNetDebugProvider implements IDebugProvider {
                 quoteArgs: false
             }
         };
+        const map = extensionConfig.getDotnetDebugSourceFileMap();
+        if (map) {
+            try {
+                const json: string = `{"${map.replace(/\\/g, "\\\\")}":"${workspaceFolder.replace(/\\/g, "\\\\")}"}`;
+                const sourceFileMap: JSON = JSON.parse(json);
+                debugConfiguration['sourceFileMap'] = sourceFileMap;
+            } catch (error) {
+                kubeChannel.showOutput(error.message);
+            }
+        }
         const currentFolder = (vscode.workspace.workspaceFolders || []).find((folder) => folder.name === path.basename(workspaceFolder));
         const result = await vscode.debug.startDebugging(currentFolder, debugConfiguration);
         if (!result) {
@@ -74,5 +85,9 @@ export class DotNetDebugProvider implements IDebugProvider {
 
     public isPortRequired(): boolean {
         return false;
+    }
+
+    public async getDebugArgs(): Promise<Cancellable> {
+        return { cancelled: false };
     }
 }

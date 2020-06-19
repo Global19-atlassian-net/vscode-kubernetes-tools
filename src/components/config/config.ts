@@ -6,6 +6,7 @@ const EXTENSION_CONFIG_KEY = "vs-kubernetes";
 const KUBECONFIG_PATH_KEY = "vs-kubernetes.kubeconfig";
 const KNOWN_KUBECONFIGS_KEY = "vs-kubernetes.knownKubeconfigs";
 const KUBECTL_VERSIONING_KEY = "vs-kubernetes.kubectlVersioning";
+const RESOURCES_TO_WATCH_KEY = "vs-kubernetes.resources-to-watch";
 
 export enum KubectlVersioning {
     UserProvided = 1,
@@ -229,4 +230,20 @@ export function getPythonRemoteRoot(): string {
 // remote debugging port for Python. Usually 5678
 export function getPythonDebugPort(): number | undefined {
     return vscode.workspace.getConfiguration(EXTENSION_CONFIG_KEY)['vs-kubernetes.python-debug-port'];
+}
+
+
+// remote debugging sourceFileMap for dotnet. An entry "sourceFileMap": {"<vs-kubernetes.dotnet-source-file-map>":"$workspaceFolder"} will be added to the debug configuration
+export function getDotnetDebugSourceFileMap(): string | undefined {
+    return vscode.workspace.getConfiguration(EXTENSION_CONFIG_KEY)['vs-kubernetes.dotnet-source-file-map'];
+}
+
+// Functions for working with the list of resources to be watched
+
+export function getResourcesToBeWatched(): string[] {
+    const krwConfig = vscode.workspace.getConfiguration(EXTENSION_CONFIG_KEY)[RESOURCES_TO_WATCH_KEY];
+    if (!krwConfig || !krwConfig.length) {
+        return [];
+    }
+    return krwConfig as string[];
 }
